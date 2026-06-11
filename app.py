@@ -1,40 +1,106 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
+from datetime import datetime
 
-# Cấu hình trang
-st.set_page_config(page_title="Daylight ERP", layout="centered")
+# Cấu hình giao diện di động
+st.set_page_config(page_title="DAYLIGHT VIETNAM ERP", layout="centered")
 
-st.title("☀️ DAYLIGHT VIETNAM ERP")
+st.markdown("""
+    <style>
+    .main { background-color: #F1F5F9; }
+    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #1E3A8A; color: white; }
+    .stTabs [data-baseweb="tab"] { font-weight: bold; font-size: 16px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Kết nối Google Sheets
+st.title("☀️ DAYLIGHT VIETNAM")
+
+# ================= KẾT NỐI GOOGLE SHEETS =================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(worksheet="KHO")
-    
-    # Hiển thị Tab
-    tab1, tab2 = st.tabs(["📦 KHO HÀNG", "📄 BÁO GIÁ"])
-    
-    with tab1:
-        st.subheader("Tồn kho thực tế")
-        if not df.empty:
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.warning("Kho hàng trống.")
-            
-    with tab2:
-        st.subheader("Lập báo giá nhanh")
-        if not df.empty:
-            san_pham = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"].tolist())
-            sl = st.number_input("Số lượng", min_value=1)
-            if st.button("Tính tiền"):
-                don_gia = df.loc[df["Tên sản phẩm"] == san_pham, "Giá"].values[0]
-                thanh_tien = sl * don_gia
-                st.success(f"Tổng tiền: {thanh_tien:,.0f} VNĐ")
-        else:
-            st.error("Không có dữ liệu để báo giá.")
-
+    # Đọc dữ liệu từ tab KHO, tự động bỏ qua các dòng trống
+    df_kho = conn.read(worksheet="KHO").dropna(how="all")
 except Exception as e:
-    st.error("Lỗi kết nối dữ liệu. Vui lòng kiểm tra lại cấu hình Secrets.")
-    with st.expander("Chi tiết lỗi"):
-        st.write(e)
+    st.error(f"Chưa kết nối được Google Drive: {e}")
+    df_kho = pd.DataFrame(columns=["Tên sản phẩm", "ĐVT", "Tồn", "Giá"])
+
+if 'quote' not in st.session_state:
+    st.session_state.quote = []
+
+tab1, tab2, tab3 = st.tabs(["📦 KHO HÀNG", "📄 LẬP BÁO GIÁ", "🤝 HỢP ĐỒNG"])
+
+# --- TAB QUẢN LÝ KHO ---
+with tab1:
+    st.subheader("Trạng thái tồn kho thực tế")
+    if not df_kho.empty:
+        st.dataframe(df_kho, use_container_width=True, hide_index=True)
+    else:
+        st.info("Kho hàng trống hoặc đang chờ kết nối dữ liệu...")
+
+    with st.expander("➕ Nhập thêm vật tư / Thiết bị"):
+        name = st.text_input("Tên thiết bị")
+        u = st.text_input("Đơn vị tính (ĐVT)", value="Cái")
+        q = st.number_input("Số lượng nhập", min_value=1, value=1)
+        p = st.number_input("Giá gốc (VNĐ)", min_value=0, step=1000)
+
+        if st.button("Xác nhận ghi vào Google Drive"):
+            if name:
+                # Logic thêm dòng mới
+                new_row = pd.DataFrame([{"Tên sản phẩm": name, "ĐVT": u, "Tồn": q, "Giá": p}])
+                updated_df = pd.concat([df_kho, new_row], ignore_index=True)
+
+                # Lệnh ghi đè trực tiếp lên file Google Sheets trên Drive
+                conn.update(worksheet="KHO", data=updated_df)
+                st.success(f"Đã đồng bộ vĩnh viễn sản phẩm '{name}' lên Google Drive!")
+                st.rerun()
+            else:
+                st.warning("Vui lòng nhập tên sản phẩm!")
+
+# --- TAB LẬP BÁO GIÁ ---
+with tab2:
+    st.subheader("Thông tin khách hàng")
+    c_name = st.text_input("Tên khách hàng / Đơn vị")
+    c_phone = st.text_input("Số điện thoại")
+
+    st.subheader("Chọn vật tư xuất bán")
+    if not df_kho.empty:
+        list_sp = df_kho["Tên sản phẩm"].tolist()
+        sp_selected = st.selectbox("Sản phẩm trong kho", list_sp)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            sl = st.number_input("SL bán", min_value=1, value=1)
+        with col2:
+            vat = st.selectbox("VAT", ["0%", "5%", "8%", "10%"])
+
+        if st.button("➕ Thêm vào danh sách"):
+            # Tìm giá của sản phẩm được chọn
+            row_sp = df_kho[df_kho["Tên sản phẩm"] == sp_selected].iloc[0]
+            gia_goc = float(row_sp["Giá"])
+            thanh_tien = sl * gia_goc * (1 + int(vat.replace("%",""))/100)
+
+            st.session_state.quote.append({
+                "Sản phẩm": sp_selected, "SL": sl, "Đơn giá": gia_goc, "VAT": vat, "Thành tiền": thanh_tien
+            })
+            st.toast("Đã thêm vào giỏ hàng báo giá!")
+    else:
+        st.warning("Không có sản phẩm nào trong kho để lập báo giá.")
+
+    if st.session_state.quote:
+        st.markdown("---")
+        df_q = pd.DataFrame(st.session_state.quote)
+        st.dataframe(df_q, use_container_width=True, hide_index=True)
+        tong = sum(item["Thành tiền"] for item in st.session_state.quote)
+        st.error(f"TỔNG CỘNG THANH TOÁN: {tong:,.0f} VNĐ")
+
+        if st.button("🗑️ XÓA HẾT DÒNG"):
+            st.session_state.quote = []
+            st.rerun()
+
+# --- TAB HỢP ĐỒNG ---
+with tab3:
+    st.subheader("Soạn hợp đồng nhanh")
+    if st.button("✨ AI TỰ ĐỘNG SOẠN THẢO"):
+        content = f"CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nKhách hàng: {c_name.upper()}\nSĐT: {c_phone}\n..."
+        st.text_area("Bản xem trước nội dung", value=content, height=300)
