@@ -24,7 +24,7 @@ st.markdown("""<style>.main { background-color: #F1F5F9; } .stButton>button { wi
 
 st.title("☀️ DAYLIGHT VIETNAM")
 
-# --- KẾT NỐI (LÀM MỚI SAU 5 PHÚT = 300 GIÂY) ---
+# --- KẾT NỐI (LÀM MỚI SAU 300 GIÂY = 5 PHÚT) ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df_kho = conn.read(worksheet="KHO", ttl=300).dropna(how="all")
@@ -35,7 +35,7 @@ if 'quote' not in st.session_state: st.session_state.quote = []
 
 tab1, tab2, tab3 = st.tabs(["📦 KHO HÀNG", "📄 LẬP BÁO GIÁ", "🤝 HỢP ĐỒNG"])
 
-# --- TAB 1: KHO ---
+# --- TAB KHO ---
 with tab1:
     st.dataframe(df_kho, use_container_width=True, hide_index=True)
     if st.expander("➕ Nhập hàng"):
@@ -47,7 +47,7 @@ with tab1:
             conn.update(worksheet="KHO", data=pd.concat([df_kho, new_row], ignore_index=True))
             st.cache_data.clear(); st.rerun()
 
-# --- TAB 2: BÁO GIÁ ---
+# --- TAB BÁO GIÁ ---
 with tab2:
     c_name = st.text_input("Tên khách hàng")
     c_phone = st.text_input("SĐT")
@@ -74,16 +74,12 @@ with tab2:
             ws.merge_cells('A5:G5'); ws['A5'] = "BẢNG BÁO GIÁ CHI TIẾT"; ws['A5'].font = Font(bold=True, size=16); ws['A5'].alignment = Alignment(horizontal='center')
             ws['A7'] = f"Kính gửi: {c_name.upper()}"; ws['A8'] = f"SĐT: {c_phone}"
             # Bảng
-            headers = ["STT", "Tên sản phẩm", "ĐVT", "SL", "Đơn giá", "VAT", "Thành tiền"]
-            for c, h in enumerate(headers, 1): ws.cell(row=11, column=c, value=h).fill = HEADER_FILL
+            headers = ["STT", "Sản phẩm", "ĐVT", "SL", "Đơn giá", "VAT", "Thành tiền"]
+            for c, h in enumerate(headers, 1):
+                cell = ws.cell(row=11, column=c, value=h)
+                cell.fill = HEADER_FILL; cell.font = HEADER_FONT
             for i, r in enumerate(st.session_state.quote, 1):
                 ws.append([i, r.get("Sản phẩm"), "Cái", r.get("SL"), r.get("Đơn giá"), r.get("VAT"), r.get("Thành tiền")])
-            # Thông tin thanh toán
-            row_idx = len(st.session_state.quote) + 13
-            ws.cell(row=row_idx, column=1, value="THÔNG TIN THANH TOÁN:").font = Font(bold=True)
-            ws.cell(row=row_idx+1, column=1, value=f"Chủ TK: {BANK_NAME_BENEFICIARY}")
-            ws.cell(row=row_idx+2, column=1, value=BANK_STK)
-            ws.cell(row=row_idx+3, column=1, value=BANK_BRANCH)
             out = io.BytesIO(); wb.save(out); return out.getvalue()
 
         col1, col2, col3 = st.columns(3)
@@ -104,4 +100,4 @@ with tab2:
 # --- TAB 3: HỢP ĐỒNG ---
 with tab3:
     if st.button("✨ AI SOẠN HỢP ĐỒNG"):
-        st.text_area("Nội dung", value=
+        st.text_area("Nội dung", value=f"HỢP ĐỒNG KINH TẾ\nBên A: {c_name}", height=300)
