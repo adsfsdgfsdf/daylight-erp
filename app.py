@@ -63,23 +63,36 @@ with tab2:
     if st.session_state.quote:
         df_q = pd.DataFrame(st.session_state.quote)
         st.dataframe(df_q, use_container_width=True)
+        tong = sum(item["Thành tiền"] for item in st.session_state.quote)
+        st.error(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
         def generate_pro_excel():
             wb = Workbook(); ws = wb.active
-            ws.page_setup.paperSize = ws.PAPERSIZE_A4
-            ws.page_setup.fitToWidth = 1
+            ws.page_setup.paperSize = ws.PAPERSIZE_A4; ws.page_setup.fitToWidth = 1
             # Header công ty
-            ws['A1'] = COMPANY_NAME; ws['A1'].font = Font(bold=True, size=12, color="1E3A8A")
+            ws['A1'] = COMPANY_NAME; ws['A1'].font = Font(bold=True)
             ws['A2'] = f"Địa chỉ: {COMPANY_ADDR}"; ws['A3'] = f"MST: {COMPANY_MST}"
             ws.merge_cells('A5:G5'); ws['A5'] = "BẢNG BÁO GIÁ CHI TIẾT"; ws['A5'].font = Font(bold=True, size=16); ws['A5'].alignment = Alignment(horizontal='center')
-            ws['A7'] = f"Kính gửi: {c_name.upper()}"; ws['A8'] = f"SĐT: {c_phone}"
+            ws['A7'] = f"Kính gửi: {c_name.upper()}"; ws['A7'].font = Font(bold=True); ws['A8'] = f"SĐT: {c_phone}"
             # Bảng
-            headers = ["STT", "Sản phẩm", "ĐVT", "SL", "Đơn giá", "VAT", "Thành tiền"]
+            headers = ["STT", "TÊN SẢN PHẨM / QUY CÁCH", "ĐVT", "SL", "ĐƠN GIÁ", "THUẾ VAT", "THÀNH TIỀN"]
             for c, h in enumerate(headers, 1):
                 cell = ws.cell(row=11, column=c, value=h)
-                cell.fill = HEADER_FILL; cell.font = HEADER_FONT
+                cell.fill = HEADER_FILL; cell.font = HEADER_FONT; cell.border = THIN_BORDER
             for i, r in enumerate(st.session_state.quote, 1):
                 ws.append([i, r.get("Sản phẩm"), "Cái", r.get("SL"), r.get("Đơn giá"), r.get("VAT"), r.get("Thành tiền")])
+                for col in range(1, 8): ws.cell(row=i+11, column=col).border = THIN_BORDER
+            # Tổng cộng
+            curr_r = len(st.session_state.quote) + 12
+            ws.merge_cells(f'A{curr_r}:F{curr_r}'); ws.cell(row=curr_r, column=1, value="TỔNG CỘNG THANH TOÁN:").alignment = Alignment(horizontal='right')
+            ws.cell(row=curr_r, column=7, value=tong).font = Font(bold=True)
+            # Thanh toán
+            ws.cell(row=curr_r+2, column=1, value="* Ghi chú: Thời gian bảo hành thiết bị theo tiêu chuẩn hãng.").font = Font(italic=True)
+            ws.cell(row=curr_r+3, column=1, value="THÔNG TIN THANH TOÁN:").font = Font(bold=True)
+            ws.cell(row=curr_r+4, column=1, value=f"Chủ TK: {BANK_NAME_BENEFICIARY}"); ws.cell(row=curr_r+5, column=1, value=BANK_STK)
+            ws.cell(row=curr_r+6, column=1, value=BANK_BRANCH)
+            ws.cell(row=curr_r+8, column=2, value="NGƯỜI LẬP BIỂU").font = Font(bold=True)
+            ws.cell(row=curr_r+8, column=6, value="ĐẠI DIỆN CÔNG TY").font = Font(bold=True)
             out = io.BytesIO(); wb.save(out); return out.getvalue()
 
         col1, col2, col3 = st.columns(3)
