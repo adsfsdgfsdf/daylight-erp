@@ -19,8 +19,10 @@ st.title("☀️ DAYLIGHT VIETNAM")
 # ================= KẾT NỐI GOOGLE SHEETS =================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # Đọc dữ liệu từ tab KHO, tự động bỏ qua các dòng trống
-    df_kho = conn.read(worksheet="KHO").dropna(how="all")
+    
+    # ĐÃ SỬA TẠI ĐÂY: Thêm ttl="1m" để ứng dụng tự động làm mới bảng hàng hóa sau mỗi phút
+    df_kho = conn.read(worksheet="KHO", ttl="1m").dropna(how="all")
+    
 except Exception as e:
     st.error(f"Chưa kết nối được Google Drive: {e}")
     df_kho = pd.DataFrame(columns=["Tên sản phẩm", "ĐVT", "Tồn", "Giá"])
@@ -52,6 +54,10 @@ with tab1:
 
                 # Lệnh ghi đè trực tiếp lên file Google Sheets trên Drive
                 conn.update(worksheet="KHO", data=updated_df)
+                
+                # ĐÃ SỬA THÊM TẠI ĐÂY: Xóa bộ nhớ đệm ngay sau khi ghi để app hiện sản phẩm mới liền
+                st.cache_data.clear()
+                
                 st.success(f"Đã đồng bộ vĩnh viễn sản phẩm '{name}' lên Google Drive!")
                 st.rerun()
             else:
