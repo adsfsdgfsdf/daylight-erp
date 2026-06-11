@@ -7,7 +7,7 @@ from openpyxl.worksheet.page import PageMargins
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 
-# --- CẤU HÌNH CÔNG TY ---
+# --- CẤU HÌNH ---
 COMPANY_NAME = "CÔNG TY TNHH DAYLIGHT VIỆT NAM"
 COMPANY_MST = "2301380133"
 COMPANY_ADDR = "Đông Lâu, Đại Đồng, Tiên Du, Bắc Ninh"
@@ -15,7 +15,7 @@ BANK_NAME_BENEFICIARY = "CÔNG TY TNHH DAYLIGHT VIỆT NAM"
 BANK_STK = "Số tài khoản: 688 608 632 999"
 BANK_BRANCH = "Ngân hàng: TMCP Công thương Việt Nam (Vietinbank) - CN KCN Tiên Sơn"
 
-# --- STYLE EXCEL ---
+# --- STYLE ---
 THIN_BORDER = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 HEADER_FILL = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -35,7 +35,6 @@ if 'quote' not in st.session_state: st.session_state.quote = []
 
 tab1, tab2, tab3 = st.tabs(["📦 KHO HÀNG", "📄 LẬP BÁO GIÁ", "🤝 HỢP ĐỒNG"])
 
-# --- TAB 1: KHO ---
 with tab1:
     st.dataframe(df_kho, use_container_width=True, hide_index=True)
     with st.expander("➕ Nhập hàng mới"):
@@ -47,7 +46,6 @@ with tab1:
             conn.update(worksheet="KHO", data=pd.concat([df_kho, new_row], ignore_index=True))
             st.cache_data.clear(); st.rerun()
 
-# --- TAB 2: BÁO GIÁ ---
 with tab2:
     c_name = st.text_input("Tên khách hàng")
     c_phone = st.text_input("SĐT khách hàng")
@@ -68,7 +66,6 @@ with tab2:
         df_q = pd.DataFrame(st.session_state.quote)
         st.dataframe(df_q, use_container_width=True)
         tong = sum(item["Thành tiền"] for item in st.session_state.quote)
-        st.error(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
         def generate_full_excel():
             wb = Workbook(); ws = wb.active
@@ -76,7 +73,7 @@ with tab2:
             # Ép trang A4
             ws.page_setup.paperSize = ws.PAPERSIZE_A4
             ws.page_setup.fitToWidth = 1
-            ws.page_setup.fitToHeight = 1
+            ws.page_setup.fitToHeight = 0
             ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.5, bottom=0.5)
             
             # Header
@@ -87,18 +84,19 @@ with tab2:
             
             # Bảng
             headers = ["STT", "TÊN SẢN PHẨM / QUY CÁCH", "ĐVT", "SL", "ĐƠN GIÁ", "THUẾ VAT", "THÀNH TIỀN"]
-            for c, h in enumerate(headers, 1):
+            widths = [5, 35, 8, 7, 14, 9, 15]
+            for c, (h, w) in enumerate(zip(headers, widths), 1):
                 cell = ws.cell(row=11, column=c, value=h)
                 cell.fill = HEADER_FILL; cell.font = HEADER_FONT; cell.alignment = Alignment(horizontal='center'); cell.border = THIN_BORDER
-                ws.column_dimensions[get_column_letter(c)].width = 20 if c != 2 else 40
+                ws.column_dimensions[get_column_letter(c)].width = w
             
             for i, r in enumerate(st.session_state.quote, 1):
                 row_data = [i, r.get("Sản phẩm"), "Cái", r.get("SL"), r.get("Đơn giá"), r.get("VAT"), r.get("Thành tiền")]
                 for col, val in enumerate(row_data, 1):
-                    cell = ws.cell(row=i+11, column=col, value=val)
-                    cell.border = THIN_BORDER
+                    c_cell = ws.cell(row=i+11, column=col, value=val)
+                    c_cell.border = THIN_BORDER
             
-            # Chân trang & Ký tên
+            # Chân trang
             curr = len(st.session_state.quote) + 12
             ws.merge_cells(f'A{curr}:F{curr}'); ws.cell(row=curr, column=1, value="TỔNG CỘNG THANH TOÁN:").alignment = Alignment(horizontal='right')
             ws.cell(row=curr, column=7, value=tong).font = Font(bold=True); ws.cell(row=curr, column=7).fill = YELLOW_FILL; ws.cell(row=curr, column=7).border = THIN_BORDER
@@ -111,13 +109,9 @@ with tab2:
             
             out = io.BytesIO(); wb.save(out); return out.getvalue()
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button("📥 Excel A4 Chuẩn", generate_full_excel(), f"BaoGia_{c_name}.xlsx")
-        with col2:
-            if st.button("🗑️ Reset báo giá"): st.session_state.quote = []; st.rerun()
+        st.download_button("📥 Excel A4 Chuẩn", generate_full_excel(), f"BaoGia_{c_name}.xlsx")
+        if st.button("🗑️ Reset báo giá"): st.session_state.quote = []; st.rerun()
 
-# --- TAB 3: HỢP ĐỒNG ---
 with tab3:
     if st.button("✨ AI SOẠN HỢP ĐỒNG"):
         st.text_area("Nội dung", value=f"HỢP ĐỒNG KINH TẾ\nBên A: {c_name}", height=300)
