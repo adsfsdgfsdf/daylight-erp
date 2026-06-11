@@ -19,10 +19,8 @@ st.title("☀️ DAYLIGHT VIETNAM")
 # ================= KẾT NỐI GOOGLE SHEETS =================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    
-    # ĐÃ SỬA TẠI ĐÂY: Thêm ttl="1m" để ứng dụng tự động làm mới bảng hàng hóa sau mỗi phút
+    # Tự động làm mới bảng hàng hóa từ Google Sheets sau mỗi 1 phút (ttl="1m")
     df_kho = conn.read(worksheet="KHO", ttl="1m").dropna(how="all")
-    
 except Exception as e:
     st.error(f"Chưa kết nối được Google Drive: {e}")
     df_kho = pd.DataFrame(columns=["Tên sản phẩm", "ĐVT", "Tồn", "Giá"])
@@ -32,7 +30,7 @@ if 'quote' not in st.session_state:
 
 tab1, tab2, tab3 = st.tabs(["📦 KHO HÀNG", "📄 LẬP BÁO GIÁ", "🤝 HỢP ĐỒNG"])
 
-# --- TAB QUẢN LÝ KHO ---
+# --- TAB 1: QUẢN LÝ KHO ---
 with tab1:
     st.subheader("Trạng thái tồn kho thực tế")
     if not df_kho.empty:
@@ -55,7 +53,7 @@ with tab1:
                 # Lệnh ghi đè trực tiếp lên file Google Sheets trên Drive
                 conn.update(worksheet="KHO", data=updated_df)
                 
-                # ĐÃ SỬA THÊM TẠI ĐÂY: Xóa bộ nhớ đệm ngay sau khi ghi để app hiện sản phẩm mới liền
+                # Xóa bộ nhớ đệm ngay lập tức để app hiển thị vật tư mới luôn
                 st.cache_data.clear()
                 
                 st.success(f"Đã đồng bộ vĩnh viễn sản phẩm '{name}' lên Google Drive!")
@@ -63,7 +61,7 @@ with tab1:
             else:
                 st.warning("Vui lòng nhập tên sản phẩm!")
 
-# --- TAB LẬP BÁO GIÁ ---
+# --- TAB 2: LẬP BÁO GIÁ ---
 with tab2:
     st.subheader("Thông tin khách hàng")
     c_name = st.text_input("Tên khách hàng / Đơn vị")
@@ -100,11 +98,29 @@ with tab2:
         tong = sum(item["Thành tiền"] for item in st.session_state.quote)
         st.error(f"TỔNG CỘNG THANH TOÁN: {tong:,.0f} VNĐ")
 
-        if st.button("🗑️ XÓA HẾT DÒNG"):
-            st.session_state.quote = []
-            st.rerun()
+        # Chia 2 nút bấm nằm ngang hàng cho đẹp giao diện di động
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            # Mã hóa dữ liệu utf-8-sig để Excel trên máy tính đọc không bao giờ lỗi font tiếng Việt
+            csv = df_q.to_csv(index=False).encode('utf-8-sig')
+            # Tự động đặt tên file theo tên khách hàng nhập vào
+            ten_file = f"Bao_Gia_{c_name}.csv" if c_name else "Bao_Gia_Daylight.csv"
+            
+            st.download_button(
+                label="📥 TẢI FILE BÁO GIÁ",
+                data=csv,
+                file_name=ten_file,
+                mime="text/csv",
+                use_container_width=True
+            )
+            
+        with col_btn2:
+            if st.button("🗑️ XÓA HẾT DÒNG", use_container_width=True):
+                st.session_state.quote = []
+                st.rerun()
 
-# --- TAB HỢP ĐỒNG ---
+# --- TAB 3: HỢP ĐỒNG ---
 with tab3:
     st.subheader("Soạn hợp đồng nhanh")
     if st.button("✨ AI TỰ ĐỘNG SOẠN THẢO"):
