@@ -7,7 +7,25 @@ from openpyxl.worksheet.page import PageMargins
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 
-# --- CẤU HÌNH ---
+# --- CẤU HÌNH BẢO MẬT ---
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+    if not st.session_state.password_correct:
+        st.title("🔒 HỆ THỐNG BẢO MẬT DAYLIGHT")
+        pwd = st.text_input("Vui lòng nhập mật khẩu:", type="password")
+        if st.button("Đăng nhập"):
+            if pwd == "170401": 
+                st.session_state.password_correct = True
+                st.rerun()
+            else:
+                st.error("Sai mật khẩu!")
+        st.stop()
+    return True
+
+check_password()
+
+# --- CẤU HÌNH CÔNG TY ---
 COMPANY_NAME = "CÔNG TY TNHH DAYLIGHT VIỆT NAM"
 COMPANY_MST = "2301380133"
 COMPANY_ADDR = "Đông Lâu, Đại Đồng, Tiên Du, Bắc Ninh"
@@ -15,7 +33,6 @@ BANK_NAME_BENEFICIARY = "CÔNG TY TNHH DAYLIGHT VIỆT NAM"
 BANK_STK = "Số tài khoản: 688 608 632 999"
 BANK_BRANCH = "Ngân hàng: TMCP Công thương Việt Nam (Vietinbank) - CN KCN Tiên Sơn"
 
-# --- STYLE ---
 THIN_BORDER = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 HEADER_FILL = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -66,9 +83,8 @@ with tab2:
         df_q = pd.DataFrame(st.session_state.quote)
         st.dataframe(df_q, use_container_width=True)
         tong = sum(item["Thành tiền"] for item in st.session_state.quote)
-        st.subheader(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
+        st.error(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
-        # NÚT CHỤP ẢNH MÀN HÌNH (ZALO)
         if st.button("📸 TẠO ẢNH BÁO GIÁ"):
             st.session_state.show_capture = True
         
@@ -76,11 +92,9 @@ with tab2:
             st.markdown(f"""
             <div style='background-color: white; border: 2px solid #1E3A8A; padding: 20px; border-radius: 15px; color: #333;'>
                 <h2 style='color: #1E3A8A; text-align: center;'>BÁO GIÁ DAYLIGHT</h2>
-                <p><b>Khách:</b> {c_name}</p>
-                <hr>
+                <p><b>Khách:</b> {c_name}</p><hr>
                 {''.join([f"<p>{r['Sản phẩm']} x {r['SL']} = <b>{r['Thành tiền']:,.0f} đ</b></p>" for r in st.session_state.quote])}
-                <hr>
-                <h3 style='text-align: right; color: #E11D48;'>TỔNG: {tong:,.0f} đ</h3>
+                <hr><h3 style='text-align: right; color: #E11D48;'>TỔNG: {tong:,.0f} đ</h3>
             </div>
             """, unsafe_allow_html=True)
             if st.button("Đóng Ảnh"): st.session_state.show_capture = False; st.rerun()
