@@ -2,7 +2,18 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
+# Kết nối với Google Sheets sử dụng credentials đã lưu trong Secrets
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Đọc dữ liệu từ tab KHO
+df = conn.read(worksheet="KHO")
+
+# Hiển thị dữ liệu
+st.title("☀️ DAYLIGHT VIETNAM - KHO HÀNG")
+st.dataframe(df, use_container_width=True)
 # Cấu hình giao diện di động
 st.set_page_config(page_title="DAYLIGHT VIETNAM ERP", layout="centered")
 
