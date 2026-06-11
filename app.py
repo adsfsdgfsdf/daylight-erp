@@ -51,31 +51,44 @@ with tab1:
 with tab2:
     c_name = st.text_input("Tên khách hàng")
     c_phone = st.text_input("SĐT")
-    sp_selected = st.selectbox("Chọn vật tư", df_kho["Tên sản phẩm"].tolist() if not df_kho.empty else [])
+    # Đảm bảo list_sp không bị lỗi khi df_kho trống
+    list_sp = df_kho["Tên sản phẩm"].tolist() if not df_kho.empty else []
+    sp_selected = st.selectbox("Chọn vật tư", list_sp)
     sl = st.number_input("SL bán", min_value=1)
     vat = st.selectbox("VAT", ["0%", "5%", "8%", "10%"])
 
     if st.button("➕ Thêm"):
+        # Lấy giá từ df_kho an toàn
         row = df_kho[df_kho["Tên sản phẩm"] == sp_selected].iloc[0]
-        st.session_state.quote.append({"Sản phẩm": sp_selected, "SL": sl, "Đơn giá": float(row["Giá"]), "VAT": vat, "Thành tiền": sl * float(row["Giá"]) * (1 + int(vat.replace("%",""))/100)})
+        st.session_state.quote.append({
+            "Sản phẩm": sp_selected, 
+            "SL": sl, 
+            "Đơn giá": float(row["Giá"]), 
+            "VAT": vat, 
+            "Thành tiền": sl * float(row["Giá"]) * (1 + int(vat.replace("%",""))/100)
+        })
         st.rerun()
 
     if st.session_state.quote:
         df_q = pd.DataFrame(st.session_state.quote)
         st.dataframe(df_q, use_container_width=True)
+        tong = sum(item["Thành tiền"] for item in st.session_state.quote)
+        st.error(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
+        # HÀM EXCEL A4 CHUẨN
         def generate_excel():
             wb = Workbook(); ws = wb.active
             ws.page_setup.paperSize = ws.PAPERSIZE_A4
-            ws.page_setup.fitToWidth = 1 # Ép A4
-            ws.append(["STT", "Sản phẩm", "ĐVT", "SL", "Đơn giá", "VAT", "Thành tiền"])
-            for i, r in enumerate(st.session_state.quote, 1):
-                ws.append([i, r.get("Sản phẩm", ""), "Cái", r.get("SL", 0), r.get("Đơn giá", 0), r.get("VAT", "0%"), r.get("Thành tiền", 0)])
+            ws.page_setup.fitToWidth = 1 
+            headers = ["STT", "Sản phẩm", "ĐVT", "SL", "Đơn giá", "VAT", "Thành tiền"]
+            for c, h in enumerate(headers, 1): ws.cell(row=1, column=c, value=h)
+            for i, r in enumerate(st.session_state.quote, 2):
+                ws.append([i-1, r.get("Sản phẩm"), "Cái", r.get("SL"), r.get("Đơn giá"), r.get("VAT"), r.get("Thành tiền")])
             out = io.BytesIO(); wb.save(out); return out.getvalue()
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.download_button("📥 Tải Excel A4", generate_excel(), f"BaoGia_{c_name}.xlsx", use_container_width=True)
+            st.download_button("📥 Excel A4", generate_excel(), f"BaoGia_{c_name}.xlsx", use_container_width=True)
         with col2:
             if st.button("📸 Bill Zalo"): st.session_state.show_zalo = True
         with col3:
