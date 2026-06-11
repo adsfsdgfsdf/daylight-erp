@@ -19,12 +19,14 @@ BANK_BRANCH = "Ngân hàng: TMCP Công thương Việt Nam (Vietinbank) - CN KCN
 THIN_BORDER = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 HEADER_FILL = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
+YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 st.set_page_config(page_title="DAYLIGHT VIETNAM ERP", layout="centered")
 st.markdown("""<style>.main { background-color: #F1F5F9; } .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #1E3A8A; color: white; font-weight: bold; }</style>""", unsafe_allow_html=True)
 
 st.title("☀️ DAYLIGHT VIETNAM")
 
+# --- KẾT NỐI ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df_kho = conn.read(worksheet="KHO", ttl=300).dropna(how="all")
@@ -35,6 +37,7 @@ if 'quote' not in st.session_state: st.session_state.quote = []
 
 tab1, tab2, tab3 = st.tabs(["📦 KHO HÀNG", "📄 LẬP BÁO GIÁ", "🤝 HỢP ĐỒNG"])
 
+# --- TAB KHO ---
 with tab1:
     st.dataframe(df_kho, use_container_width=True, hide_index=True)
     if st.expander("➕ Nhập hàng"):
@@ -46,6 +49,7 @@ with tab1:
             conn.update(worksheet="KHO", data=pd.concat([df_kho, new_row], ignore_index=True))
             st.cache_data.clear(); st.rerun()
 
+# --- TAB BÁO GIÁ ---
 with tab2:
     c_name = st.text_input("Tên khách hàng")
     c_phone = st.text_input("SĐT")
@@ -64,37 +68,44 @@ with tab2:
         tong = sum(item["Thành tiền"] for item in st.session_state.quote)
         st.error(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
-        def generate_pro_excel():
+        def generate_full_pro_excel():
             wb = Workbook(); ws = wb.active
-            ws.page_setup.paperSize = ws.PAPERSIZE_A4
-            ws.page_setup.fitToWidth = 1
-            # Sửa lỗi PageMargins bằng cách khởi tạo đối tượng chuẩn
-            ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.5, bottom=0.5)
+            ws.page_setup.paperSize = ws.PAPERSIZE_A4; ws.page_setup.fitToWidth = 1
+            ws.page_margins = PageMargins(left=0.4, right=0.4, top=0.5, bottom=0.5)
             
-            ws['A1'] = COMPANY_NAME; ws['A1'].font = Font(bold=True, size=12, color="1E3A8A")
+            # Header
+            ws['A1'] = COMPANY_NAME; ws['A1'].font = Font(bold=True)
             ws['A2'] = f"Địa chỉ: {COMPANY_ADDR}"; ws['A3'] = f"MST: {COMPANY_MST}"
             ws.merge_cells('A5:G5'); ws['A5'] = "BẢNG BÁO GIÁ CHI TIẾT"; ws['A5'].font = Font(bold=True, size=16); ws['A5'].alignment = Alignment(horizontal='center')
             ws['A7'] = f"Kính gửi: {c_name.upper()}"; ws['A7'].font = Font(bold=True); ws['A8'] = f"SĐT: {c_phone}"
             
+            # Bảng
             headers = ["STT", "TÊN SẢN PHẨM / QUY CÁCH", "ĐVT", "SL", "ĐƠN GIÁ", "THUẾ VAT", "THÀNH TIỀN"]
             for c, h in enumerate(headers, 1):
                 cell = ws.cell(row=11, column=c, value=h)
-                cell.fill = HEADER_FILL; cell.font = HEADER_FONT; cell.alignment = Alignment(horizontal='center')
-                ws.column_dimensions[chr(64+c)].width = 15 if c > 2 else 25
+                cell.fill = HEADER_FILL; cell.font = HEADER_FONT; cell.alignment = Alignment(horizontal='center', vertical='center'); cell.border = THIN_BORDER
+                ws.column_dimensions[chr(64+c)].width = 20 if c!=2 else 40
             
             for i, r in enumerate(st.session_state.quote, 1):
                 ws.append([i, r.get("Sản phẩm"), "Cái", r.get("SL"), r.get("Đơn giá"), r.get("VAT"), r.get("Thành tiền")])
                 for col in range(1, 8): ws.cell(row=i+11, column=col).border = THIN_BORDER
             
+            # Tổng cộng
             curr_r = len(st.session_state.quote) + 12
-            ws.merge_cells(f'A{curr_r}:F{curr_r}'); ws.cell(row=curr_r, column=7, value=tong).font = Font(bold=True)
-            ws.cell(row=curr_r+2, column=1, value="THÔNG TIN THANH TOÁN:").font = Font(bold=True)
-            ws.cell(row=curr_r+3, column=1, value=BANK_STK); ws.cell(row=curr_r+4, column=1, value=BANK_BRANCH)
+            ws.merge_cells(f'A{curr_r}:F{curr_r}'); ws.cell(row=curr_r, column=1, value="TỔNG CỘNG THANH TOÁN:").alignment = Alignment(horizontal='right')
+            ws.cell(row=curr_r, column=7, value=tong).font = Font(bold=True); ws.cell(row=curr_r, column=7).fill = YELLOW_FILL; ws.cell(row=curr_r, column=7).border = THIN_BORDER
+            
+            # Chân trang
+            row_footer = curr_r + 2
+            ws.cell(row=row_footer, column=1, value="* Ghi chú: Thời gian bảo hành thiết bị theo tiêu chuẩn hãng.").font = Font(italic=True)
+            ws.cell(row=row_footer+1, column=1, value="THÔNG TIN THANH TOÁN:").font = Font(bold=True, underline="single")
+            ws.cell(row=row_footer+2, column=1, value=f"Chủ TK: {BANK_NAME_BENEFICIARY}"); ws.cell(row=row_footer+3, column=1, value=BANK_STK); ws.cell(row=row_footer+4, column=1, value=BANK_BRANCH)
+            ws.cell(row=row_footer+6, column=2, value="NGƯỜI LẬP BIỂU").font = Font(bold=True); ws.cell(row=row_footer+6, column=6, value="ĐẠI DIỆN CÔNG TY").font = Font(bold=True)
             out = io.BytesIO(); wb.save(out); return out.getvalue()
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.download_button("📥 Excel A4", generate_pro_excel(), f"BaoGia_{c_name}.xlsx", use_container_width=True)
+            st.download_button("📥 Excel A4 Chuẩn", generate_full_pro_excel(), f"BaoGia_{c_name}.xlsx", use_container_width=True)
         with col2:
             if st.button("📸 Bill Zalo"): st.session_state.show_zalo = True
         with col3:
@@ -107,6 +118,7 @@ with tab2:
             st.markdown(bill, unsafe_allow_html=True)
             if st.button("Đóng Bill"): st.session_state.show_zalo = False; st.rerun()
 
+# --- TAB 3: HỢP ĐỒNG ---
 with tab3:
     if st.button("✨ AI SOẠN HỢP ĐỒNG"):
         st.text_area("Nội dung", value=f"HỢP ĐỒNG KINH TẾ\nBên A: {c_name}", height=300)
