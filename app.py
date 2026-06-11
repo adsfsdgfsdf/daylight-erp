@@ -66,23 +66,38 @@ with tab2:
         df_q = pd.DataFrame(st.session_state.quote)
         st.dataframe(df_q, use_container_width=True)
         tong = sum(item["Thành tiền"] for item in st.session_state.quote)
+        st.subheader(f"TỔNG CỘNG: {tong:,.0f} VNĐ")
         
+        # NÚT CHỤP ẢNH MÀN HÌNH (ZALO)
+        if st.button("📸 TẠO ẢNH BÁO GIÁ"):
+            st.session_state.show_capture = True
+        
+        if st.session_state.get("show_capture"):
+            st.markdown(f"""
+            <div style='background-color: white; border: 2px solid #1E3A8A; padding: 20px; border-radius: 15px; color: #333;'>
+                <h2 style='color: #1E3A8A; text-align: center;'>BÁO GIÁ DAYLIGHT</h2>
+                <p><b>Khách:</b> {c_name}</p>
+                <hr>
+                {''.join([f"<p>{r['Sản phẩm']} x {r['SL']} = <b>{r['Thành tiền']:,.0f} đ</b></p>" for r in st.session_state.quote])}
+                <hr>
+                <h3 style='text-align: right; color: #E11D48;'>TỔNG: {tong:,.0f} đ</h3>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("Đóng Ảnh"): st.session_state.show_capture = False; st.rerun()
+
         def generate_full_excel():
             wb = Workbook(); ws = wb.active
             ws.title = "BaoGia"
-            # Ép trang A4
             ws.page_setup.paperSize = ws.PAPERSIZE_A4
             ws.page_setup.fitToWidth = 1
             ws.page_setup.fitToHeight = 0
             ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.5, bottom=0.5)
             
-            # Header
             ws['A1'] = COMPANY_NAME; ws['A1'].font = Font(bold=True)
             ws['A2'] = f"Địa chỉ: {COMPANY_ADDR}"; ws['A3'] = f"MST: {COMPANY_MST}"
             ws.merge_cells('A5:G5'); ws['A5'] = "BẢNG BÁO GIÁ CHI TIẾT"; ws['A5'].font = Font(bold=True, size=16); ws['A5'].alignment = Alignment(horizontal='center')
             ws['A7'] = f"Kính gửi: {c_name.upper()}"; ws['A7'].font = Font(bold=True); ws['A8'] = f"SĐT: {c_phone}"; ws['A9'] = f"Địa chỉ: {c_addr}"
             
-            # Bảng
             headers = ["STT", "TÊN SẢN PHẨM / QUY CÁCH", "ĐVT", "SL", "ĐƠN GIÁ", "THUẾ VAT", "THÀNH TIỀN"]
             widths = [5, 35, 8, 7, 14, 9, 15]
             for c, (h, w) in enumerate(zip(headers, widths), 1):
@@ -96,7 +111,6 @@ with tab2:
                     c_cell = ws.cell(row=i+11, column=col, value=val)
                     c_cell.border = THIN_BORDER
             
-            # Chân trang
             curr = len(st.session_state.quote) + 12
             ws.merge_cells(f'A{curr}:F{curr}'); ws.cell(row=curr, column=1, value="TỔNG CỘNG THANH TOÁN:").alignment = Alignment(horizontal='right')
             ws.cell(row=curr, column=7, value=tong).font = Font(bold=True); ws.cell(row=curr, column=7).fill = YELLOW_FILL; ws.cell(row=curr, column=7).border = THIN_BORDER
